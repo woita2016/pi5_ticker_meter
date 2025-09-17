@@ -30,7 +30,7 @@ async def get_quote(ticker: str):
 
 @app.get("/register")
 async def get_register(username: str, token: str):
-    if username = "xxx" and token = "xxx":
+    if username == "xxx" and token == "xxx":
         return {"status": "succeeded"}
     else:
         return {"status": "failed"}
