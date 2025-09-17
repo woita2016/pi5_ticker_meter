@@ -14,9 +14,9 @@ BRAPI_URL = "https://brapi.dev/api/quote/{ticker}?token={token}&modules=defaultK
 cache = TTLCache(maxsize=1000, ttl=CACHE_TTL)
 
 @app.get("/quote/{ticker}")
-async def get_quote(ticker: str, privileged: bool = Query(False)):
+async def get_quote(ticker: str):
+#async def get_quote(ticker: str, privileged: bool = Query(False)):
     ticker = ticker.upper()
-
     if privileged or ticker not in cache:
         url = BRAPI_URL.format(ticker=ticker, token=BRAPI_TOKEN)
         try:
@@ -27,3 +27,11 @@ async def get_quote(ticker: str, privileged: bool = Query(False)):
         except Exception as e:
             return {"error": f"Failed to fetch data for {ticker}: {str(e)}"}
     return cache[ticker]
+
+@app.get("/register")
+async def get_register(username: str, token: str):
+    if username = "xxx" and token = "xxx":
+        return {"status": "succeeded"}
+    else:
+        return {"status": "failed"}
+
