@@ -14,8 +14,7 @@ BRAPI_URL = "https://brapi.dev/api/quote/{ticker}?token={token}&modules=defaultK
 cache = TTLCache(maxsize=1000, ttl=CACHE_TTL)
 
 @app.get("/quote/{ticker}")
-async def get_quote(ticker: str):
-#async def get_quote(ticker: str, privileged: bool = Query(False)):
+async def get_quote(ticker: str, privileged: bool = Query(False)):
     ticker = ticker.upper()
     if privileged or ticker not in cache:
         url = BRAPI_URL.format(ticker=ticker, token=BRAPI_TOKEN)
