@@ -26,8 +26,8 @@ db_pool = pool.SimpleConnectionPool(
     dsn=DB_URL
 )
 
-def get_user(input_username, input_token):
-    if input_username not in user_cache:
+def get_user(input_username, input_token, force_verify):
+    if input_username not in user_cache or force_verify:
         conn = db_pool.getconn()
         try:
             with conn.cursor() as cursor:
@@ -87,7 +87,7 @@ initialize_users_table()
 @app.get("/quote/{ticker}")
 async def get_quote(ticker: str, username: str, token: str):
     ticker = ticker.upper()
-    result = get_user(username, token)
+    result = get_user(username, token, False)
     if result is None:
         return {"error": f"Failed to fetch data for {ticker}: {str(e)}"}
     else:
@@ -104,7 +104,7 @@ async def get_quote(ticker: str, username: str, token: str):
 
 @app.get("/register")
 async def get_register(username: str, token: str):
-    result = get_user(username, token)
+    result = get_user(username, token, True)
     if result is None:
         return {"status": "failed"}
     else:
