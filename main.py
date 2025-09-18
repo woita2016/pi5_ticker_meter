@@ -38,8 +38,8 @@ def get_user(input_username, input_token, force_verify):
                     LIMIT 1;
                 """, (input_username, input_token, 'active'))
                 result = cursor.fetchone()
-                user_cache[input_username] = result
-                return result
+                user_cache[input_username] = result[0]
+                return result[0]
         except Exception as e:
             print(f"DB error: {e}")
             return None
