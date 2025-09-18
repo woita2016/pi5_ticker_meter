@@ -31,7 +31,7 @@ def get_user(input_username, input_token):
     try:
         with conn.cursor() as cursor:
             cursor.execute("""
-                SELECT status, privileged
+                SELECT privileged
                 FROM users
                 WHERE username = %s AND token = %s AND status = %s
                 LIMIT 1;
