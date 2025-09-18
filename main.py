@@ -105,8 +105,4 @@ async def get_register(username: str, token: str):
     if result is None:
         return {"status": "failed"}
     else:
-        status, privileged = result
-        if status == "active":
-            return {"status": "succeeded"}
-        else:
-            return {"status": "failed"}
+        return {"status": "succeeded"}
