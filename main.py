@@ -102,7 +102,7 @@ async def get_quote(ticker: str, username: str, token: str):
                 return {"error": f"Failed to fetch data for {ticker}: {str(e)}"}
         return cache[ticker]
 
-@app.get("/register")
+@app.get("/user_check")
 async def get_register(username: str, token: str):
     result = get_user(username, token, True)
     if result is None:
