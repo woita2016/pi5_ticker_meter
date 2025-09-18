@@ -27,23 +27,26 @@ db_pool = pool.SimpleConnectionPool(
 )
 
 def get_user(input_username, input_token):
-    conn = db_pool.getconn()
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                SELECT privileged
-                FROM users
-                WHERE username = %s AND token = %s AND status = %s
-                LIMIT 1;
-            """, (input_username, input_token, 'active'))
-            result = cursor.fetchone()
-            user_cache[input_username] = result
-            return result
-    except Exception as e:
-        print(f"DB error: {e}")
-        return None
-    finally:
-        db_pool.putconn(conn)
+    if input_username not in user_cache:
+        conn = db_pool.getconn()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT privileged
+                    FROM users
+                    WHERE username = %s AND token = %s AND status = %s
+                    LIMIT 1;
+                """, (input_username, input_token, 'active'))
+                result = cursor.fetchone()
+                user_cache[input_username] = result
+                return result
+        except Exception as e:
+            print(f"DB error: {e}")
+            return None
+        finally:
+            db_pool.putconn(conn)
+    else:
+        return user_cache[input_username]
 
 def initialize_users_table():
     conn = db_pool.getconn()
