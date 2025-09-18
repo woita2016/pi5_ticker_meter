@@ -2,3 +2,4 @@ fastapi
 uvicorn
 requests
 cachetools
+psycopg2-binary
