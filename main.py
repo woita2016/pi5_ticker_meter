@@ -13,7 +13,7 @@ USER_CACHE_TTL = int(os.getenv("USER_CACHE_TTL", "86400"))
 CACHE_TTL = int(os.getenv("CACHE_TTL", "1200")) 
 DB_URL = os.getenv("DB_URL", "postgres://<username>:<password>@<host>:<port>/<database>") 
 BRAPI_TOKEN = os.getenv("BRAPI_TOKEN", "your_token_here")
-BRAPI_URL = "https://brapi.dev/api/quote/{ticker}?token={token}&modules=defaultKeyStatistics"
+BRAPI_URL = os.getenv("BRAPI_URL", "https://brapi.dev/api/quote/{ticker}?token={token}&modules=defaultKeyStatistics")
 
 # In-memory cache
 cache = TTLCache(maxsize=1000, ttl=CACHE_TTL)
