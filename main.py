@@ -257,7 +257,7 @@ async def update_user_token(username: str, token: str, payload: TokenUpdatePaylo
 ###########################################################################################################################
 
 @app.get("/user_list")
-async def user_list(username: str, token: str):
+async def user_list(username: str, token: str, target_username: str | None = None):
     conn = db_pool.getconn()
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
@@ -270,10 +270,19 @@ async def user_list(username: str, token: str):
             if cursor.fetchone() is None or username != "admin":
                 return {"status": "unauthorized"}
 
-            # Fetch all users
-            cursor.execute("""
-                SELECT username, token, status, privileged FROM users;
-            """)
+            # Fetch filtered or full user list
+            if target_username:
+                cursor.execute("""
+                    SELECT username, token, status, privileged
+                    FROM users
+                    WHERE username = %s;
+                """, (target_username,))
+            else:
+                cursor.execute("""
+                    SELECT username, token, status, privileged
+                    FROM users;
+                """)
+
             rows = cursor.fetchall()
             users = [dict(row) for row in rows]
             return {"status": "succeeded", "users": users}
