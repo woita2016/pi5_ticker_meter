@@ -2,11 +2,16 @@ import requests
 import os
 import psycopg2
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Body
 from cachetools import TTLCache
 from psycopg2 import pool
+from pydantic import BaseModel
+
+###########################################################################################################################
 
 app = FastAPI()
+
+###########################################################################################################################
 
 # Load environment variables
 USER_CACHE_TTL = int(os.getenv("USER_CACHE_TTL", "86400")) 
@@ -25,6 +30,8 @@ db_pool = pool.SimpleConnectionPool(
     maxconn=10,
     dsn=DB_URL
 )
+
+###########################################################################################################################
 
 def get_user(input_username, input_token, force_verify):
     if input_username not in user_cache or force_verify:
@@ -86,7 +93,8 @@ def initialize_users_table():
 
 initialize_users_table()
 
-#async def get_quote(ticker: str, privileged: bool = Query(False)):
+###########################################################################################################################
+
 @app.get("/quote/{ticker}")
 async def get_quote(ticker: str, username: str, token: str):
     ticker = ticker.upper()
@@ -105,10 +113,171 @@ async def get_quote(ticker: str, username: str, token: str):
                 return {"error": f"Failed to fetch data for {ticker}: {str(e)}"}
         return cache[ticker]
 
+###########################################################################################################################
+
 @app.get("/user_check")
-async def get_register(username: str, token: str):
+async def user_check(username: str, token: str):
     result = get_user(username, token, True)
     if result is None:
         return {"status": "failed"}
     else:
         return {"status": result}
+
+###########################################################################################################################
+
+class AdminUserUpdatePayload(BaseModel):
+    target_username: str
+    token: str | None = None
+    status: str | None = None
+    privileged: str | None = None
+
+@app.put("/update_user")
+async def update_user(username: str, token: str, payload: AdminUserUpdatePayload = Body(...)):
+    conn = db_pool.getconn()
+    try:
+        with conn.cursor() as cursor:
+            # Verify admin identity
+            cursor.execute("""
+                SELECT 1 FROM users
+                WHERE username = %s AND token = %s AND status = 'active'
+                LIMIT 1;
+            """, (username, token))
+            if cursor.fetchone() is None or username != "admin":
+                return {"status": "unauthorized"}
+
+            # Build update query
+            fields = []
+            values = []
+
+            if payload.token is not None:
+                fields.append("token = %s")
+                values.append(payload.token)
+            if payload.status is not None:
+                fields.append("status = %s")
+                values.append(payload.status)
+            if payload.privileged is not None:
+                fields.append("privileged = %s")
+                values.append(payload.privileged)
+
+            if not fields:
+                return {"status": "failed", "reason": "no fields to update"}
+
+            values.append(payload.target_username)
+
+            query = f"""
+                UPDATE users
+                SET {', '.join(fields)}
+                WHERE username = %s
+            """
+
+            cursor.execute(query, values)
+            conn.commit()
+            if cursor.rowcount == 0:
+                return {"status": "failed", "reason": "target user not found"}
+            return {"status": "succeeded"}
+    except Exception as e:
+        print(f"DB error: {e}")
+        return {"status": "failed", "reason": str(e)}
+    finally:
+        db_pool.putconn(conn)
+
+###########################################################################################################################
+
+class AddUserPayload(BaseModel):
+    target_username: str
+    token: str
+    status: str
+    privileged: str
+
+@app.post("/add_user")
+async def add_user(username: str, token: str, payload: AddUserPayload = Body(...)):
+    conn = db_pool.getconn()
+    try:
+        with conn.cursor() as cursor:
+            # Verify admin identity
+            cursor.execute("""
+                SELECT 1 FROM users
+                WHERE username = %s AND token = %s AND status = 'active'
+                LIMIT 1;
+            """, (username, token))
+            if cursor.fetchone() is None or username != "admin":
+                return {"status": "unauthorized"}
+
+            # Check if target user already exists
+            cursor.execute("""
+                SELECT 1 FROM users WHERE username = %s LIMIT 1;
+            """, (payload.target_username,))
+            if cursor.fetchone():
+                return {"status": "failed", "reason": "user already exists"}
+
+            # Insert new user
+            cursor.execute("""
+                INSERT INTO users (username, token, status, privileged)
+                VALUES (%s, %s, %s, %s);
+            """, (
+                payload.target_username,
+                payload.token,
+                payload.status,
+                payload.privileged
+            ))
+            conn.commit()
+            return {"status": "succeeded"}
+    except Exception as e:
+        print(f"DB error: {e}")
+        return {"status": "failed", "reason": str(e)}
+    finally:
+        db_pool.putconn(conn)
+
+###########################################################################################################################
+
+class TokenUpdatePayload(BaseModel):
+    new_token: str
+
+@app.put("/update_user_token")
+async def update_user_token(username: str, token: str, payload: TokenUpdatePayload = Body(...)):
+    conn = db_pool.getconn()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                UPDATE users
+                SET token = %s
+                WHERE username = %s AND token = %s
+            """, (payload.new_token, username, token))
+            conn.commit()
+            if cursor.rowcount == 0:
+                return {"status": "failed", "reason": "user not found or token mismatch"}
+            return {"status": "succeeded"}
+    except Exception as e:
+        print(f"DB error: {e}")
+        return {"status": "failed", "reason": str(e)}
+    finally:
+        db_pool.putconn(conn)
+
+###########################################################################################################################
+
+@app.get("/user_list")
+async def user_list(username: str, token: str):
+    conn = db_pool.getconn()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            # Verify admin token
+            cursor.execute("""
+                SELECT 1 FROM users
+                WHERE username = %s AND token = %s AND status = 'active'
+                LIMIT 1;
+            """, (username, token))
+            if cursor.fetchone() is None or username != "admin":
+                return {"status": "unauthorized"}
+
+            # Fetch all users
+            cursor.execute("""
+                SELECT username, token, status, privileged FROM users;
+            """)
+            rows = cursor.fetchall()
+            users = [dict(row) for row in rows]
+            return {"status": "succeeded", "users": users}
+    except Exception as e:
+        print(f"DB error: {e}")
+        return {"status": "failed", "reason": str(e)}
+    finally:
+        db_pool.putconn(conn)
