@@ -1,6 +1,7 @@
 import requests
 import os
 import psycopg2
+import psycopg2.extras
 
 from fastapi import FastAPI, Query, Body
 from cachetools import TTLCache
